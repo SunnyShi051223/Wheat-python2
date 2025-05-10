@@ -2,7 +2,6 @@ import os
 from flask import Flask, request, render_template, redirect, url_for
 from werkzeug.utils import secure_filename
 
-# --- 导入你的预测函数（下面我们稍后在 predict.py 中添加一个 predict_image 函数） ---
 from predict import predict_image
 
 # 配置
