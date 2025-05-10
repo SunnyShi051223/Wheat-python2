@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>小麦图片分类</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h1>小麦病害分类</h1>
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".jpg,.jpeg,.png" required>
+    <button type="submit">上传并预测</button>
+  </form>
+
+  {% if filename %}
+    <h2>预测结果：</h2>
+    <img src="{{ url_for('uploaded_file', filename=filename) }}" width="200"><br>
+    <p>最可能类别：<strong>{{ pred_class }}</strong></p>
+
+    <h3>各类别概率：</h3>
+    <ul>
+      {% for p in pred_probs %}
+        <li>类别 {{ loop.index0 }}： {{ '%.4f'|format(p) }}</li>
+      {% endfor %}
+    </ul>
+
+    <!-- 图表容器 -->
+    <h3>识别图表：</h3>
+    <canvas id="barChart" width="400" height="200"></canvas>
+    <canvas id="pieChart" width="400" height="200"></canvas>
+    <canvas id="radarChart" width="400" height="300"></canvas>
+
+    <script>
+      // 生成类别标签 [0,1,2,...]
+      const labels = {{ range(pred_probs|length)|list|tojson }};
+      const data = {{ pred_probs|tojson }};
+
+      // 柱状图
+      new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+          labels: labels.map(l => "类别 " + l),
+          datasets: [{
+            label: '预测概率',
+            data: data,
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+
+      // 饼图
+      new Chart(document.getElementById('pieChart'), {
+        type: 'pie',
+        data: {
+          labels: labels.map(l => "类别 " + l),
+          datasets: [{
+            data: data,
+            backgroundColor: [
+              '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+            ]
+          }]
+        }
+      });
+
+      // 雷达图
+      new Chart(document.getElementById('radarChart'), {
+        type: 'radar',
+        data: {
+          labels: labels.map(l => "类别 " + l),
+          datasets: [{
+            label: '预测分布',
+            data: data,
+            fill: true,
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            borderColor: 'rgb(255, 99, 132)',
+            pointBackgroundColor: 'rgb(255, 99, 132)',
+            pointBorderColor: '#fff',
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: 'rgb(255, 99, 132)'
+          }]
+        },
+        options: {
+          scales: {
+            r: { beginAtZero: true, max: 1 }
+          }
+        }
+      });
+    </script>
+  {% endif %}
+</body>
+</html>
