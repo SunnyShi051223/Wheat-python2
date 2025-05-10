@@ -8,7 +8,6 @@ from tensorflow.keras.preprocessing.image import load_img, img_to_array
 import lightgbm as lgb
 import tensorflow as tf
 
-# ---------- 原有的随机种子、模型构建部分保持不变 ----------
 
 seed_value = 42
 random.seed(seed_value)
@@ -35,7 +34,7 @@ def load_and_preprocess_image(image_path):
     img_array = np.expand_dims(img_array, axis=0)
     return img_array
 
-# ===== 新增：对外接口函数 =====
+# ===== 对外接口函数 =====
 def predict_image(image_path):
     """输入图片路径，返回(预测类别, 各类别概率列表)"""
     # 1. 预处理
@@ -56,7 +55,6 @@ def predict_image(image_path):
     class_labels = ['0', '1', '2', '3', '4']
     return class_labels[pred_class_index], list(pred_probs)
 
-# 保留命令行调用逻辑（可选）
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
