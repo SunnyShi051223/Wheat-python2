@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+
+{% block title %}小麦图片分类 - 多模型对比{% endblock %}
+
+{% block extra_css %}
+<style>
+    .model-results {
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+    .model-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .model-name {
+        font-size: 1.2em;
+        font-weight: bold;
+    }
+    .inference-time {
+        color: #666;
+        font-size: 0.9em;
+    }
+    .chart-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 20px;
+    }
+    .chart-wrapper {
+        flex: 1;
+        min-width: 300px;
+        margin-bottom: 20px;
+    }
+    .chart-controls {
+        margin: 10px 0;
+        padding: 10px;
+        background: #f5f5f5;
+        border-radius: 5px;
+    }
+    .chart-controls select, .chart-controls input {
+        margin: 5px;
+        padding: 5px;
+    }
+    .chart-controls label {
+        margin-right: 10px;
+    }
+    .color-picker {
+        display: inline-block;
+        margin: 5px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>小麦病害分类 - 多模型对比</h1>
+<form method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".jpg,.jpeg,.png" required>
+    <button type="submit">上传并预测</button>
+</form>
+
+{% if filename %}
+    <h2>预测结果：</h2>
+    <img src="{{ url_for('uploaded_file', filename=filename) }}" width="200"><br>
+
+    {% for model_name, result in results.items() %}
+    <div class="model-results">
+        <div class="model-header">
+            <span class="model-name">{{ model_name }} 模型</span>
+            <span class="inference-time">推理时间: {{ "%.4f"|format(result.inference_time) }}秒</span>
+        </div>
+        <p>预测类别：<strong>{{ result.class }}</strong></p>
+
+        <div class="chart-controls">
+            <label>图表类型：</label>
+            <select id="chartType_{{ model_name }}" onchange="updateChart('{{ model_name }}')">
+                <option value="bar">柱状图</option>
+                <option value="line">折线图</option>
+                <option value="radar">雷达图</option>
+                <option value="polarArea">极坐标图</option>
+                <option value="doughnut">环形图</option>
+            </select>
+            
+            <label>颜色主题：</label>
+            <select id="colorTheme_{{ model_name }}" onchange="updateChart('{{ model_name }}')">
+                <option value="default">默认</option>
+                <option value="dark">暗色</option>
+                <option value="light">亮色</option>
+                <option value="gradient">渐变色</option>
+            </select>
+
+            <label>动画效果：</label>
+            <select id="animation_{{ model_name }}" onchange="updateChart('{{ model_name }}')">
+                <option value="true">开启</option>
+                <option value="false">关闭</option>
+            </select>
+
+            <label>显示网格：</label>
+            <select id="grid_{{ model_name }}" onchange="updateChart('{{ model_name }}')">
+                <option value="true">是</option>
+                <option value="false">否</option>
+            </select>
+        </div>
+
+        <div class="chart-container">
+            <div class="chart-wrapper">
+                <canvas id="mainChart_{{ model_name }}" width="400" height="300"></canvas>
+            </div>
+        </div>
+
+        <!-- 存储模型数据 -->
+        <script>
+            window.modelData = window.modelData || {};
+            window.modelData['{{ model_name }}'] = {
+                probabilities: {{ result.probabilities|tojson }},
+                class: '{{ result.class }}',
+                inference_time: {{ result.inference_time }}
+            };
+        </script>
+    </div>
+    {% endfor %}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const classLabels = {{ range(5)|list|tojson }};
+    const colorThemes = {
+        default: {
+            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)'
+        },
+        dark: {
+            backgroundColor: 'rgba(75, 75, 75, 0.7)',
+            borderColor: 'rgba(75, 75, 75, 1)'
+        },
+        light: {
+            backgroundColor: 'rgba(255, 206, 86, 0.7)',
+            borderColor: 'rgba(255, 206, 86, 1)'
+        },
+        gradient: {
+            backgroundColor: [
+                'rgba(255, 99, 132, 0.7)',
+                'rgba(54, 162, 235, 0.7)',
+                'rgba(255, 206, 86, 0.7)',
+                'rgba(75, 192, 192, 0.7)',
+                'rgba(153, 102, 255, 0.7)'
+            ],
+            borderColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)'
+            ]
+        }
+    };
+
+    let charts = {};
+
+    function getChartConfig(modelName) {
+        const modelData = window.modelData[modelName];
+        const chartType = document.getElementById(`chartType_${modelName}`).value;
+        const colorTheme = colorThemes[document.getElementById(`colorTheme_${modelName}`).value];
+        const showAnimation = document.getElementById(`animation_${modelName}`).value === 'true';
+        const showGrid = document.getElementById(`grid_${modelName}`).value === 'true';
+
+        const baseConfig = {
+            type: chartType,
+            data: {
+                labels: classLabels.map(l => "类别 " + l),
+                datasets: [{
+                    label: '预测概率',
+                    data: modelData.probabilities,
+                    backgroundColor: colorTheme.backgroundColor,
+                    borderColor: colorTheme.borderColor,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: showAnimation,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            display: showGrid
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: showGrid
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${modelName} 模型预测概率分布`
+                    },
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                }
+            }
+        };
+
+        // 为特定图表类型添加特殊配置
+        if (chartType === 'radar') {
+            baseConfig.options.scales = {
+                r: {
+                    beginAtZero: true,
+                    max: 1,
+                    grid: {
+                        display: showGrid
+                    }
+                }
+            };
+        }
+
+        return baseConfig;
+    }
+
+    function updateChart(modelName) {
+        const config = getChartConfig(modelName);
+        
+        if (charts[modelName]) {
+            charts[modelName].destroy();
+        }
+        
+        const ctx = document.getElementById(`mainChart_${modelName}`).getContext('2d');
+        charts[modelName] = new Chart(ctx, config);
+    }
+
+    // 初始化所有图表的配置
+    {% if filename %}
+        {% for model_name in results.keys() %}
+        updateChart('{{ model_name }}');
+        {% endfor %}
+    {% endif %}
+</script>
+{% endblock %}
