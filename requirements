@@ -1,6 +1,5 @@
 Flask==2.2.5
-numpy
-==2.12.0
+numpy==2.12.0
 lightgbm
 joblib
 Pillow
