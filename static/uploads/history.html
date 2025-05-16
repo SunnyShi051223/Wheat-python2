@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>历史记录 - 小麦图片分类</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            margin-left: 15px;
+            text-decoration: none;
+            color: #333;
+        }
+        .prediction-card {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .prediction-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .prediction-image {
+            max-width: 200px;
+            margin-right: 20px;
+        }
+        .prediction-content {
+            display: flex;
+        }
+        .prediction-details {
+            flex: 1;
+        }
+        .pagination {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .pagination a {
+            margin: 0 5px;
+            padding: 5px 10px;
+            text-decoration: none;
+            color: #333;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .pagination a.active {
+            background-color: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+        .true-label-form {
+            margin-top: 10px;
+        }
+        .true-label-form input {
+            padding: 5px;
+            margin-right: 10px;
+        }
+        .true-label-form button {
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>历史记录</h1>
+            <div class="nav-links">
+                <a href="{{ url_for('index') }}">返回首页</a>
+                <a href="{{ url_for('logout') }}">退出登录</a>
+            </div>
+        </div>
+
+        {% for prediction in predictions.items %}
+         <!--预测记录卡片展示-->
+        <div class="prediction-card">
+            <div class="prediction-header">
+                <h3>预测记录 #{{ prediction.id }}</h3>
+                <span>{{ prediction.created_at }}</span>
+            </div>
+            
+            <div class="prediction-content">
+                <img src="{{ url_for('uploaded_file', filename=prediction.image_path) }}" 
+                     class="prediction-image" alt="预测图片">
+                
+                <div class="prediction-details">
+                    <h4>预测结果：</h4>
+                    {% for model_name, result in prediction.predictions.items() %}
+                    <div>
+                        <strong>{{ model_name }} 模型：</strong>
+                        <p>预测类别：{{ result.class }}</p>
+                        <p>推理时间：{{ "%.4f"|format(result.inference_time) }}秒</p>
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="true-label-form">
+                        <form onsubmit="updateTrueLabel(event, {{ prediction.id }})">
+                            <label for="true_label">真实标签：</label>
+                            <input type="text" id="true_label_{{ prediction.id }}" 
+                                   value="{{ prediction.true_label or '' }}" 
+                                   placeholder="输入真实标签">
+                            <button type="submit">更新</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        <!-- 分页 -->
+        <div class="pagination">
+            {% if predictions.has_prev %}
+            <a href="{{ url_for('history', page=predictions.prev_num) }}">上一页</a>
+            {% endif %}
+            
+            {% for page in predictions.iter_pages() %}
+                {% if page %}
+                    <a href="{{ url_for('history', page=page) }}" 
+                       class="{{ 'active' if page == predictions.page else '' }}">
+                        {{ page }}
+                    </a>
+                {% else %}
+                    <span>...</span>
+                {% endif %}
+            {% endfor %}
+            
+            {% if predictions.has_next %}
+            <a href="{{ url_for('history', page=predictions.next_num) }}">下一页</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+        // JavaScript 的 fetch() 向 /update_prediction/<id> 发送 POST 请求，异步更新 true_label
+        function updateTrueLabel(event, predictionId) {
+            event.preventDefault();
+            const trueLabel = document.getElementById(`true_label_${predictionId}`).value;
+            
+            fetch(`/update_prediction/${predictionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `true_label=${encodeURIComponent(trueLabel)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('真实标签已更新');
+                } else {
+                    alert('更新失败：' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('更新失败：' + error);
+            });
+        }
+    </script>
+</body>
+</html> 
